@@ -2,14 +2,11 @@ package codechicken.nei.recipe;
 
 import codechicken.lib.gui.GuiDraw;
 import codechicken.lib.render.CCRenderState;
-import codechicken.nei.GuiNEIButton;
-import codechicken.nei.LayoutManager;
-import codechicken.nei.NEIClientConfig;
-import codechicken.nei.NEIClientUtils;
-import codechicken.nei.PositionedStack;
+import codechicken.nei.*;
 import codechicken.nei.api.IGuiContainerOverlay;
 import codechicken.nei.api.IOverlayHandler;
 import codechicken.nei.api.IRecipeOverlayRenderer;
+import codechicken.nei.config.GuiNEIOptionList;
 import codechicken.nei.guihook.GuiContainerManager;
 import codechicken.nei.guihook.IContainerTooltipHandler;
 import codechicken.nei.guihook.IGuiClientSide;
@@ -18,6 +15,7 @@ import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.crafting.IRecipe;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
@@ -29,6 +27,7 @@ import java.util.List;
 public abstract class GuiRecipe extends GuiContainer implements IGuiContainerOverlay, IGuiClientSide, IGuiHandleMouseWheel, IContainerTooltipHandler
 {
     public ArrayList<? extends IRecipeHandler> currenthandlers = new ArrayList<>();
+    public ICraftingHandler craftingHandler;
 
     public int page;
     public int recipetype;
@@ -39,6 +38,11 @@ public abstract class GuiRecipe extends GuiContainer implements IGuiContainerOve
     public GuiButton prevpage;
     public GuiButton overlay1;
     public GuiButton overlay2;
+    public GuiButton tempTab;
+
+    //Set dynamic page start to starting ID of the dynamic pages
+    private static int dynamicPageStart = 100;
+
 
     protected GuiRecipe(GuiContainer prevgui) {
         super(new ContainerRecipe());
@@ -61,12 +65,91 @@ public abstract class GuiRecipe extends GuiContainer implements IGuiContainerOve
         prevpage = new GuiNEIButton(3, width / 2 + 57, (height + ySize) / 2 - 18, 13, 12, ">");
         overlay1 = new GuiNEIButton(4, width / 2 + 65, (height - ySize) / 2 + 63, 13, 12, "?");
         overlay2 = new GuiNEIButton(5, width / 2 + 65, (height - ySize) / 2 + 128, 13, 12, "?");
+
         buttonList.add(nexttype);
         buttonList.add(prevtype);
         buttonList.add(nextpage);
         buttonList.add(prevpage);
         buttonList.add(overlay1);
         buttonList.add(overlay2);
+
+        //Offset seems to be related to the center of the screen - TODO: find location of actual left of recipeGUI
+        int xStartPos = width /2 - 90;
+        int xPos = xStartPos;
+        int yPos = (height - ySize) / 2 - 25;
+
+        for(int type = 0; type < currenthandlers.size(); type++ ) {
+            IRecipeHandler recipehandler = currenthandlers.get(type);
+            String thisRecipe = recipehandler.getRecipeName();
+            String textString = "n/a";
+
+            switch (thisRecipe) {
+                case "Shaped Crafting":
+                    textString = "Sh";
+                    break;
+                case "Smelting":
+                    textString = "Sm";
+                    break;
+                case "Shapeless Crafting":
+                    textString = "SL";
+                    break;
+                case "Compressor":
+                    textString = "Co";
+                    break;
+                case "Fluid Extractor":
+                    textString = "FlE";
+                    break;
+                case "Fluid Solidifier":
+                    textString = "FlS";
+                    break;
+                case "Casting Table":
+                    textString = "CaT";
+                    break;
+                case "Blast Furnace":
+                    textString = "BF";
+                    break;
+                case "Infernal Blast Furnace":
+                    textString = "IBF";
+                    break;
+                case "Electromagnetic Polarizer":
+                    textString = "EmP";
+                    break;
+                case "Cryogenic Freezer":
+                    textString = "CrF";
+                    break;
+                case "Vacuum Freezer":
+                    textString = "CrF";
+                    break;
+                case "Arc Furnace":
+                    textString = "AF";
+                    break;
+                case "Unpackager":
+                    textString = "Un";
+                    break;
+                case "Alloy Smelter":
+                    textString = "AS";
+                    break;
+                case "Chisel":
+                    textString = "Ch";
+                    break;
+                default:
+                    textString = thisRecipe.substring(0,3);
+                    break;
+
+
+            }
+            int nameLength = textString.length() * 5 + 5;
+            tempTab = new GuiNEIButton(dynamicPageStart + type, xPos, yPos, nameLength, 25,  textString);
+            xPos = xPos + nameLength;
+            if (xPos - xStartPos >= 140){
+                xPos = xStartPos;
+                yPos = yPos - 25;
+            }
+
+            buttonList.add(tempTab);
+
+        }
+
 
         if (currenthandlers.size() == 1) {
             nexttype.visible = false;
@@ -137,6 +220,9 @@ public abstract class GuiRecipe extends GuiContainer implements IGuiContainerOve
             case 5:
                 overlayRecipe(page * currenthandlers.get(recipetype).recipiesPerPage() + 1);
                 break;
+            default:
+                setPage(guibutton.id);
+                break;
         }
     }
 
@@ -191,6 +277,13 @@ public abstract class GuiRecipe extends GuiContainer implements IGuiContainerOve
 
     private void prevType() {
         recipetype--;
+        if (recipetype < 0)
+            recipetype = currenthandlers.size() - 1;
+        page = 0;
+    }
+    //Statically set the page based on the dynamic page offset
+    private void setPage(int id) {
+        recipetype = id  - dynamicPageStart;
         if (recipetype < 0)
             recipetype = currenthandlers.size() - 1;
         page = 0;
